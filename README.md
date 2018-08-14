@@ -5,6 +5,8 @@ Estimate H0 from GW measurements and galaxy catalogs.
 
 This code estimates a posterior probability for the Hubble constant using a skymap from LIGO and a galaxy catalog. The formalism is similar to the one described in Del Pozzo et al. 2012, Chen et al. 2017. It can be run on data, or it can rotate skymaps on density peaks for simulations.
 
+*Note: At the moment this is running in the close distances approximation, with no deceleration parameter!*
+
 This code has been written by Antonella Palmese and Jim Annis.
 
 ## Before running 
