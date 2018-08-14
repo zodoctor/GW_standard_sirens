@@ -7,9 +7,13 @@ This code estimates a posterior probability for the Hubble constant using a skym
 
 This code has been written by Antonella Palmese and Jim Annis.
 
-## Usage
+## Usage on simulations
 ```
 python prepare_galaxy_catalog.py
 python rotate_skymap_for_catalog.py
 python H0_onevent_hpix_search_flask.py
 ```
+
+## Usage on data
+
+H0_onevent_GW170817.py : Reads in a catalog in the GW170817 area, and compares the posterior to 
