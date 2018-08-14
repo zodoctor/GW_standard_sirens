@@ -11,7 +11,7 @@ This code has been written by Antonella Palmese and Jim Annis.
 
 1. Uncompress the skymaps in the skymaps folder before running. skymap.fits is the LAL inference map for GW170814, skymapGW170817.fits is for GW170817.
 
-2. Create a "catalogs" folder with the necessary catalogs. Flask simulations and DES/2MASS catalogs for the GW1708 events can be found at /data/des60.b/data/palmese/Dark_sirens/catalogs
+2. Create a "catalogs" folder with the necessary catalogs. Flask simulations and DES/2MASS catalogs for the GW1708 events can be found at ```/data/des60.b/data/palmese/Dark_sirens/catalogs```
 
 3. Create a plots directory (These steps will be put in a Makefile).
 
