@@ -31,7 +31,9 @@ Step 2: rotate_skymap_on_galaxies.py rotates the peak of the skymap to the posit
 
 Step 3: H0_nevents_flask.py computes a posterior for N events, provided the skymaps from Step 2 and a galaxy catalog.
 
-See the codes for a full list of user defined inputs (e.g. H0, redshift range considered...).
+See the codes for a full list of user defined inputs (e.g. H0, redshift range considered...), or type 
+
+```python code.py --help```
 
 ## Usage on data
 
