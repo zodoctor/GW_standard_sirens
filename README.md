@@ -19,6 +19,8 @@ This code has been written by Antonella Palmese and Jim Annis.
 
 ## Usage on simulations
 
+From inside the "source" directory, run:
+
 ```
 python prepare_galaxy_catalog.py
 python rotate_skymap_on_galaxies.py
