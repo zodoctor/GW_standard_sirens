@@ -8,18 +8,10 @@ from scipy.constants import c #m/s
 from scipy.stats import norm
 from astropy.cosmology import FlatLambdaCDM
 import os
-
+import posterior_utils as pos
 
 #cosmo = FlatLambdaCDM(H0=70, Om0=0.3, Tcmb0=2.725)
 
-def percentile(perc, pdf, xarray): #May not be perfect due to binning...
-	sum = 0.
-	idx = 0
-	tot=pdf.sum()
-	while sum<perc:
-		sum = sum + pdf[idx]/tot
-		idx=idx+1
-	return xarray[idx]
 
 def lnlike(H0, z, pb_gal, distmu, diststd, distnorm, pixarea):
     distgal = (c/1000.)*z/H0
@@ -157,23 +149,26 @@ plt.legend()
 plt.show()
 plt.savefig('H0_posterior_GW170817.png')
 
-idx_max = np.argmax(lnposterior)
+idx_max = np.argmax(posterior)
 perc_max = posterior[:idx_max].sum()/posterior.sum()
-maxposterior = posterior[np.argmax(lnposterior)]
+maxposterior = posterior[idx_max]
 
 print "No counterpart:"
 print "ML percentile: ", perc_max
-print "H0 ML: ", H0_array[np.argmax(lnposterior)], "+", H0_array[np.argmax(lnposterior)]-percentile(perc_max-0.34, posterior, H0_array), "-", H0_array[np.argmax(lnposterior)]- percentile(perc_max+0.34, posterior, H0_array)
-print "H0 Median: ", percentile(0.50, posterior, H0_array)
+print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior, H0_array)-H0_array[idx_max], "-", H0_array[idx_max]- pos.percentile(perc_max-0.34, posterior, H0_array)
+print "H0 Median: ", pos.percentile(0.50, posterior, H0_array)
 
-idx_max = np.argmax(lnposterior_ngc)
+idx_max = np.argmax(posterior_ngc)
 perc_max = posterior_ngc[:idx_max].sum()/posterior_ngc.sum()
-maxposterior = posterior_ngc[np.argmax(lnposterior_ngc)]
+maxposterior = posterior_ngc[idx_max]
 
 print "Assuming NGC 4993"
 print "ML percentile: ", perc_max
-print "H0 ML: ", H0_array[np.argmax(lnposterior_ngc)], "+", H0_array[np.argmax(lnposterior_ngc)]-percentile(perc_max-0.34, posterior_ngc, H0_array), "-", H0_array[np.argmax(lnposterior_ngc)]- percentile(perc_max+0.34, posterior_ngc, H0_array)
-print "H0 Median: ", percentile(0.50, posterior_ngc, H0_array)
+#print "H0 ML +-34%: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior_ngc, H0_array)- H0_array[idx_max], "-", H0_array[idx_max]-pos.percentile(perc_max-0.34, posterior_ngc, H0_array)
+
+print "H0 ML with 16th and 84th percentiles: ", H0_array[idx_max], "+", np.abs(pos.percentile(0.84, posterior_ngc, H0_array)- H0_array[idx_max]), "-", np.abs(H0_array[idx_max]-pos.percentile(0.16, posterior_ngc, H0_array))
+
+print "H0 Median: ", pos.percentile(0.50, posterior_ngc, H0_array)
 
 
 

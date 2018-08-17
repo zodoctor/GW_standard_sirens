@@ -146,7 +146,7 @@ for nevent in range(nevents):
     maxposterior = posterior[np.argmax(lnposterior)]
 
     print "ML percentile: ", perc_max
-    print "H0 ML: ", H0_array[idx_max], "+", H0_array[idx_max]-pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array), "-", H0_array[idx_max] - pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)
+    print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array)
     print "H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_array)
 
 
@@ -164,7 +164,7 @@ if nevents>1:
     maxposterior = posterior_final[idx_max]
     print "-------- Final H0 estimate ---------"
     print "ML percentile: ", perc_max
-    print "H0 ML: ", H0_array[idx_max], "+", H0_array[idx_max]-pos.percentile(perc_max-0.34, posterior_final, H0_array), "-", H0_array[idx_max] - pos.percentile(perc_max+0.34, posterior_final, H0_array)
+    print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior_final, H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior_final, H0_array)
     print "H0 Median: ", pos.percentile(0.50, posterior_final, H0_array)
 
 plt.legend()
