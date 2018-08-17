@@ -1,5 +1,5 @@
 # GW_standard_sirens
-Estimate H0 from GW measurements and galaxy catalogs.
+Estimate H0 from GW measurements and galaxy catalogs. 
 
 ## Introduction
 
@@ -42,3 +42,5 @@ See the codes for a full list of user defined inputs (e.g. H0, redshift range co
 H0_onevent_GW170817.py : Reads in a catalog in the GW170817 area, and compares the H0 posterior to the one computed when considering NGC 4993 only.
 
 H0_onevent_hpix_search.py  : Reads in a catalog in healpix pixel files (as in the usual DES format) and a skymap, and produces a posterior. The default version uses the GW170814 skymap and a value added DES catalog, that can be downloaded from the DES machines.
+
+taud_onevent_hpix_search.py :  Reads in a galaxy catalog with SFHs and computes a time delay posterior assuming a cosmology.
