@@ -7,8 +7,6 @@ This code estimates a posterior probability for the Hubble constant using a skym
 
 *Note: At the moment this is running in the close distances approximation, with no deceleration parameter!*
 
-This code has been written by Antonella Palmese and Jim Annis.
-
 ## Before running 
 
 1. Uncompress the skymaps in the skymaps folder before running. skymap.fits is the LAL inference map for GW170814, skymapGW170817.fits is for GW170817.
