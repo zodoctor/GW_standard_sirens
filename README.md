@@ -37,10 +37,10 @@ See the codes for a full list of user defined inputs (e.g. H0, redshift range co
 
 ## Usage on data
 
-H0_onevent_hpix_search.py  : Reads in a catalog in healpix pixel files (as in the usual DES format) and a skymap, and produces a posterior. The default version uses the GW170814 skymap and a value added DES catalog, that can be downloaded from the DES machines. There are a bunch of keywords
+```H0_onevent_hpix_search.py```  : Reads in a catalog in healpix pixel files (as in the usual DES format) and a skymap, and produces a posterior. The default version uses the GW170814 skymap and a value added DES catalog, that can be downloaded from the DES machines. There are a bunch of keywords
 
-H0_nevents.py : reads in a single file for the catalog, can be used for multiple events (posteriors are multiplied)
+```H0_nevents.py``` : reads in a single file for the catalog, can be used for multiple events (posteriors are multiplied)
 
-H0_onevent_GW170817.py : Reads in a catalog in the GW170817 area, and compares the H0 posterior to the one computed when considering NGC 4993 only.
+```H0_onevent_GW170817.py``` : Reads in a catalog in the GW170817 area, and compares the H0 posterior to the one computed when considering NGC 4993 only.
 
-taud_onevent_hpix_search.py :  Reads in a galaxy catalog with SFHs and computes a time delay posterior assuming a cosmology.
+```taud_onevent_hpix_search.py``` :  Reads in a galaxy catalog with SFHs and computes a time delay posterior assuming a cosmology.
