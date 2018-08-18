@@ -75,7 +75,7 @@ except:
     pix_g = hp.pixelfunc.ang2pix(1024, theta_g, phi_g)
     print "No hpix column in catalog"
 
-z_g = h['z'][mask_z]
+z_g = h[z_column_name][mask_z]
 
 H0_array = np.linspace(H0_min,H0_max,num=H0bins)
 posterior = np.zeros((H0_array.shape[0],nevents))
@@ -132,7 +132,7 @@ for nevent in range(nevents):
     zerr_gal = np.zeros(z_gal.shape[0]) #np.concatenate(zerr_gal)
 
     #Posterior without normalization at the moment, and with a delta function for z
-
+    print "There are ", str(ra_gal.shape[0]), " galaxies within ", str(pb_frac*100.), "%, amd z between ", z_min, z_max
     lnposterior=[]
     pixarea = hp.nside2pixarea(NSIDE)
 
