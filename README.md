@@ -44,3 +44,7 @@ See the codes for a full list of user defined inputs (e.g. H0, redshift range co
 ```H0_onevent_GW170817.py``` : Reads in a catalog in the GW170817 area, and compares the H0 posterior to the one computed when considering NGC 4993 only.
 
 ```taud_onevent_hpix_search.py``` :  Reads in a galaxy catalog with SFHs and computes a time delay posterior assuming a cosmology.
+
+See the codes for a full list of user defined inputs (e.g. H0, redshift range considered...), or type 
+
+```python code.py --help```
