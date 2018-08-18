@@ -10,7 +10,7 @@ import argparse
 import os
 
 
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='Add hpix column ro galaxy catalog.')
 parser.add_argument('--infile', default='flask_sims_Jul18.fits',
                    help='Input galaxy catalog name')
 parser.add_argument('--outfile', default='flask_sims_Jul18_hpix.fits',
