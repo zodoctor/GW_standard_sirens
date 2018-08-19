@@ -24,6 +24,10 @@ parser.add_argument('--Hmin', default=10.,
                     help='Minimum H0 for a flat prior.')
 parser.add_argument('--Hmax', default=220.,
                     help='Maximum H0 for a flat prior.')
+parser.add_argument('--cosmo_use', default=False, type=bool,
+                    help='Use full cosmology for dL.')
+parser.add_argument('--zerr_use', default=False,  type=bool,
+                    help='Galaxy redshift is a Gaussian instead of delta function.')
 
 
 args = parser.parse_args()
@@ -34,9 +38,13 @@ z_min = args.zmin
 z_max = args.zmax
 H0_min = args.Hmin
 H0_max = args.Hmax
+cosmo_use = args.cosmo_use
+zerr_use = args.zerr_use
+
 
 pb_frac = 0.9 #Fraction of the skymap prbability to consider, decrease for speed
-NSIDE = 1024     #skymap nside, corresponding also to the nside of the hpix column in the galaxy catalog
+NSIDE = 1024     #skymap nside
+NSIDE_gal = 32     #Galaxy catalog nside
 H0bins = 100
 out_plot = 'H0_posterior_GW170814.png'
 z_column_name = 'DNF_ZMEAN_MOF'
@@ -73,7 +81,7 @@ while sum<pb_frac:
 
 idx_sort_cut = idx_sort_up[:id]
 theta,phi=hp.pixelfunc.pix2ang(NSIDE,idx_sort_cut,nest=True) #Check if it should have been nest=True
-idx_sort_cut_nside32=hp.pixelfunc.ang2pix(32,theta,phi)
+idx_sort_cut_nside32=hp.pixelfunc.ang2pix(NSIDE_gal,theta,phi)
 idx_sort_cut_nside32=np.unique(idx_sort_cut_nside32)
 
 print "Reading in galaxy catalogs..."
@@ -115,7 +123,7 @@ pixarea = hp.nside2pixarea(NSIDE )
 
 print "Estimating Posterior for H0 values:"
 for i in range(H0bins):
-	lnposterior.append(pos.lnprob(H0_array[i], z_gal, zerr_gal, pb_gal, distmu_gal, distsigma_gal, distnorm_gal, pixarea, H0_min, H0_max))
+	lnposterior.append(pos.lnprob(H0_array[i], z_gal, zerr_gal, pb_gal, distmu_gal, distsigma_gal, distnorm_gal, pixarea, H0_min, H0_max, z_min, z_max, zerr_use=zerr_use, cosmo_use=cosmo_use))
 
 posterior = np.exp(lnposterior)
 plt.ion()

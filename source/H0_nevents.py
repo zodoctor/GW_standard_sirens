@@ -15,18 +15,22 @@ parser = argparse.ArgumentParser(description='Compute H0 posterior given N event
 
 parser.add_argument('--infile', default='flask_sims_Jul18_hpix.fits',
                     help='Input galaxy catalog name with hpix numbers')
-parser.add_argument('--skymap', default='rotated_skymap',
+parser.add_argument('--skymap', default='rotated_skymap_on_galaxy_',
                     help='Input skymap')
 parser.add_argument('--nevents', default=1, type=int,
                     help='Number of events to be simulated (for now it is the same skymap being rotated)')
-parser.add_argument('--zmin', default=0.05,
+parser.add_argument('--zmin', default=0.05, type=float,
                     help='Minimum redshift to be considered in the galaxy catalog. Default is for GW170814.')
-parser.add_argument('--zmax', default=0.22,
+parser.add_argument('--zmax', default=0.22, type=float,
                     help='Maximum redshift to be considered in the galaxy catalog. Default is for GW170814.')
-parser.add_argument('--Hmin', default=10.,
+parser.add_argument('--Hmin', default=10., type=float,
                     help='Minimum H0 for a flat prior.')
-parser.add_argument('--Hmax', default=220.,
+parser.add_argument('--Hmax', default=220., type=float,
                     help='Maximum H0 for a flat prior.')
+parser.add_argument('--cosmo_use', default=False, type=bool,
+                    help='Use full cosmology for dL.')
+parser.add_argument('--zerr_use', default=False,  type=bool,
+                    help='Galaxy redshift is a Gaussian instead of delta function.')
 
 
 args = parser.parse_args()
@@ -38,10 +42,19 @@ z_min = args.zmin
 z_max = args.zmax
 H0_min = args.Hmin
 H0_max = args.Hmax
+cosmo_use = args.cosmo_use
+zerr_use = args.zerr_use
 
 pb_frac = 0.9 #Fraction of the skymap probability to consider, decrease for speed
 NSIDE = 1024     #skymap nside, corresponding also to the nside of the hpix column in the galaxy catalog
 H0bins = 100
+
+# Add by hand an error to the galaxy redshifts. Note this is fixed for all galaxies for now!
+
+test_photozs = True
+test_photozs_err = 0.1
+
+# Names of the input galaxy catalog columns
 
 ra_column_name = 'ra'
 dec_column_name = 'dec'
@@ -50,9 +63,10 @@ zerr_column_name = 'zerr'
 
 DIR_SOURCE = os.getcwd()
 DIR_MAIN = DIR_SOURCE.rsplit('/', 1)[0]
-DIR_CATALOG = DIR_MAIN+'/catalogs/'
+DIR_CATALOG = "/Users/palmese/work/GW/Dark_sirens/catalogs/buzzard/" # DIR_MAIN+'/catalogs/'
 DIR_SKYMAP = DIR_MAIN+'/skymaps/'
 DIR_PLOTS = DIR_MAIN+'/plots/'
+DIR_OUT = DIR_MAIN+'/out/'
 
 
 print "Reading in galaxy catalogs..."
@@ -83,7 +97,10 @@ posterior = np.zeros((H0_array.shape[0],nevents))
 for nevent in range(nevents):
 
     print "Reading skymap for event ", str(nevent+1)
-    skymap_name = DIR_SKYMAP+skymap+str(nevent)+".fits"
+    if (nevents==1):
+        skymap_name = DIR_SKYMAP+skymap
+    else:
+        skymap_name = DIR_SKYMAP+skymap+str(nevent)+".fits"
     map = fits.open(skymap_name)[1].data
     pb = map['PROB']
     distmu = map['DISTMU']
@@ -129,7 +146,10 @@ for nevent in range(nevents):
     distnorm_gal = np.concatenate(distnorm_gal)
     ra_gal = np.concatenate(ra_gal)
     dec_gal = np.concatenate(dec_gal)
-    zerr_gal = np.zeros(z_gal.shape[0]) #np.concatenate(zerr_gal)
+    zerr_gal = np.zeros(z_gal.shape[0]) #np.concatenate(zerr_gal) # Here zerr is 0 because it is not given in the sims
+
+    if (test_photozs==True):
+        zerr_gal.fill(test_photozs_err)
 
     #Posterior without normalization at the moment, and with a delta function for z
     print "There are ", str(ra_gal.shape[0]), " galaxies within ", str(pb_frac*100.), "%, amd z between ", z_min, z_max
@@ -138,7 +158,7 @@ for nevent in range(nevents):
 
     print "Estimating Posterior for H0 values:"
     for i in range(H0bins):
-        lnposterior_bin = pos.lnprob(H0_array[i], z_gal, zerr_gal, pb_gal, distmu_gal, distsigma_gal, distnorm_gal, pixarea, H0_min, H0_max)
+        lnposterior_bin = pos.lnprob(H0_array[i], z_gal, zerr_gal, pb_gal, distmu_gal, distsigma_gal, distnorm_gal, pixarea, H0_min, H0_max, z_min, z_max, zerr_use=zerr_use, cosmo_use=cosmo_use)
         #print i, H0_array[i],lnposterior_bin
         lnposterior.append(lnposterior_bin)
 
@@ -158,12 +178,14 @@ for nevent in range(nevents):
 plt.clf()
 for nevent in range(nevents):
     norm = np.trapz(posterior[:,nevent], H0_array)
-    plt.plot(H0_array, posterior[:,nevent]/norm, label="Event "+str(nevent))
+    posterior[:,nevent] = posterior[:,nevent]/norm
+    plt.plot(H0_array, posterior[:,nevent], label="Event "+str(nevent))
 
 if nevents>1:
     posterior_final = np.prod(posterior, axis=1)
     norm = np.trapz(posterior_final, H0_array)
-    plt.plot(H0_array, np.prod(posterior, axis=1)/norm, label="Final")
+    posterior_final = posterior_final/norm
+    plt.plot(H0_array, posterior_final, label="Final")
     idx_max = np.argmax(posterior_final)
     perc_max = posterior_final[:idx_max].sum()/posterior_final.sum()
     maxposterior = posterior_final[idx_max]
@@ -171,6 +193,19 @@ if nevents>1:
     print "ML percentile: ", perc_max
     print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior_final, H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior_final, H0_array)
     print "H0 Median: ", pos.percentile(0.50, posterior_final, H0_array)
+    cols = np.column_stack((H0_array,posterior, posterior_final))
+    fmt = "%10.5f "
+    header = "H0 "
+    for i in range(nevents+1):
+        fmt=fmt+"%10.6e "
+        header = header+" Posterior_"+str(i)
+    header = header+" Final "
+else:
+    header = "H0 posterior"
+    cols = np.column_stack((H0_array,posterior))
+    fmt = "%10.5f %10.6e"
+
+np.savetxt(DIR_OUT+'posterior_'+infile.rsplit('.')[0]+'_'+str(nevents)+'.txt',cols, header=header, fmt=fmt)
 
 plt.legend()
 plt.xlabel('$H_0$ [km/s/Mpc]',fontsize=20)
