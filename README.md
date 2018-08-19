@@ -55,4 +55,4 @@ See the codes for a full list of user defined inputs (e.g. H0, redshift range co
 
 ```H0_nevents.py``` and ```H0_onevent_hpix_search.py``` can be run using a Gaussian pdf for galaxies' redshifts (key ```--zerr_use True```) instead of a delta function, and a Flat LambdaCDM cosmology (```--cosmo_use True```) instead of a simple Hubble law. Both of these options will make the code much slower, especially the p(z).
 
-
+Check the beginning of these .py files if you want to change paths, binnings, etc. This will soon be implemented in a params.py input file.
