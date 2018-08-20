@@ -10,6 +10,8 @@ from scipy.integrate import romb
 ########### H0 utils ############
 #################################
 
+def gauss(mu, std, x):
+    return np.exp(-(x-mu)*(x-mu)/(2*std*std))/(std*(2.*pi)**0.5)
 
 def percentile(perc, pdf, xarray): #May not be perfect due to binning... Valid only for regularly spaced xarrays
     sum_pdf = 0.
@@ -34,17 +36,22 @@ def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min
         ngals = z.shape[0]
         like_gals = np.zeros(ngals)
         z_s = np.arange(z_min,z_max, step=0.02)
+        const = (c/1000.)/H0
         print H0
         for i in range(ngals):
-            like_gals[i]= pb_gal[i] * distnorm[i] * romb( norm(z[i], zerr[i]).pdf(z_s) * norm(distmu[i], diststd[i]).pdf((c/1000.)*z_s/H0)*z[i]**2, dx=0.02)
-#           like_gals[i], err = integrate.quad(lambda z_s: pb_gal[i] * distnorm[i] * norm(distmu[i], diststd[i]).pdf((c/1000.)*z_s/H0)*z[i]**2 * norm(z[i], zerr[i]).pdf(z_s), z_min, z_max)
+            # Multiply the 2 Gaussians (redshift pdf and GW likelihood) with a change of variables into one Gaussian with mean Mu_new and std sigma_new
+            #mu_new = (z[i]*diststd[i]*diststd[i]/(const*const)+ distmu[i]/const*zerr[i])/(diststd[i]*diststd[i]/(const*const)+zerr[i]*zerr[i])
+            #sigma_new = (diststd[i]*diststd[i]*zerr[i]*zerr[i]/(const*const)/(diststd[i]*diststd[i]/(const*const)+ zerr[i]*zerr[i]))**0.5
+            #like_gals[i]= pb_gal[i] * distnorm[i] * romb(gauss(mu_new, sigma_new, z_s) * z[i]*z[i], dx=0.02)
+            like_gals[i]= pb_gal[i] * distnorm[i] * romb( gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i], const*z_s)*z[i]*z[i], dx=0.02)
     else:
         ngals = z.shape[0]
         cosmo = FlatLambdaCDM(H0=H0, Om0=0.3, Tcmb0=2.725)
         like_gals = np.zeros(ngals)
         z_s = np.arange(z_min,z_max, step=0.02)
+        print H0
         for i in range(ngals):
-            like_gals[i], err = pb_gal[i] * distnorm[i] * romb(norm(z[i], zerr[i]).pdf(z_s) * norm(distmu[i], diststd[i]).pdf(cosmo.luminosity_distance(z[i]))*z[i]**2, dx=0.02)
+            like_gals[i] = pb_gal[i] * distnorm[i] * romb(gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i],cosmo.luminosity_distance(z[i]).value)*z[i]*z[i], dx=0.02)
 
     normalization = H0**3
     lnlike_sum = np.log(np.sum(like_gals)/normalization)
