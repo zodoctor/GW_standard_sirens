@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(description='Compute H0 posterior given N event
 
 parser.add_argument('--infile', default='flask_sims_Jul18_hpix.fits',
                     help='Input galaxy catalog name with hpix numbers')
-parser.add_argument('--skymap', default='rotated_skymap_on_galaxy_',
+parser.add_argument('--skymap', default='rotated_skymap_on_galaxy_0.fits',
                     help='Input skymap')
 parser.add_argument('--nevents', default=1, type=int,
                     help='Number of events to be simulated (for now it is the same skymap being rotated)')
@@ -45,14 +45,13 @@ H0_max = args.Hmax
 cosmo_use = args.cosmo_use
 zerr_use = args.zerr_use
 
-pb_frac = 0.9 #Fraction of the skymap probability to consider, decrease for speed
-NSIDE = 1024     #skymap nside, corresponding also to the nside of the hpix column in the galaxy catalog
+pb_frac = 0.7 #Fraction of the skymap probability to consider, decrease for speed
 H0bins = 100
 
-# Add by hand an error to the galaxy redshifts. Note this is fixed for all galaxies for now!
+# Add by hand an error test_photozs_err to the galaxy redshifts. Note this is fixed for all galaxies for now!
 
 test_photozs = True
-test_photozs_err = 0.1
+test_photozs_err = 0.01
 
 # Names of the input galaxy catalog columns
 
@@ -60,6 +59,8 @@ ra_column_name = 'ra'
 dec_column_name = 'dec'
 z_column_name = 'z'
 zerr_column_name = 'zerr'
+hpix_column_name = 'hpix1024' #If it exists in the galaxy catalog, if not, it is computed for the skymap given its NSIDE, default is ring
+nest = False #Watch out! mock maps have nest=True but BCC has False at the moment
 
 DIR_SOURCE = os.getcwd()
 DIR_MAIN = DIR_SOURCE.rsplit('/', 1)[0]
@@ -81,12 +82,21 @@ mask_z = ((h[z_column_name]>z_min) & (h[z_column_name]<z_max))
 ra_g=h[ra_column_name][mask_z]
 dec_g=h[dec_column_name][mask_z]
 
+#Read in the first skymap to get nside
+if (nevents==1):
+    skymap_name = DIR_SKYMAP+skymap
+else:
+    skymap_name = DIR_SKYMAP+skymap+str(0)+".fits"
+map = fits.open(skymap_name)[1].data
+pb = map['PROB'].flatten()
+NSIDE = hp.pixelfunc.get_nside(pb)
+
 try:
-    pix_g = h['hpix1024'][mask_z]
+    pix_g = h[hpix_column_name][mask_z]
 except:
     phi_g = ra_g*pi/180.
     theta_g = (90.-dec_g)*pi/180.
-    pix_g = hp.pixelfunc.ang2pix(1024, theta_g, phi_g)
+    pix_g = hp.pixelfunc.ang2pix(NSIDE, theta_g, phi_g, nest=nest)
     print "No hpix column in catalog"
 
 z_g = h[z_column_name][mask_z]
@@ -152,7 +162,7 @@ for nevent in range(nevents):
         zerr_gal.fill(test_photozs_err)
 
     #Posterior without normalization at the moment, and with a delta function for z
-    print "There are ", str(ra_gal.shape[0]), " galaxies within ", str(pb_frac*100.), "%, amd z between ", z_min, z_max
+    print "There are ", str(ra_gal.shape[0]), " galaxies within ", str(pb_frac*100.), "%, and z between ", z_min, z_max
     lnposterior=[]
     pixarea = hp.nside2pixarea(NSIDE)
 

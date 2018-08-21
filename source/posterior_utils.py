@@ -28,16 +28,19 @@ def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min
     if ((zerr_use==False) & (cosmo_use==False)):
         distgal = (c/1000.)*z/H0
         like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal)*z**2
+        normalization = H0**3
     elif ((zerr_use==False) & (cosmo_use==True)):
         cosmo = FlatLambdaCDM(H0=H0, Om0=0.3, Tcmb0=2.725)
-        distgal = cosmo.luminosity_distance(z) #in Mpc
-        like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal.value)*z**2
+        distgal = cosmo.luminosity_distance(z).value #in Mpc
+        #like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal)*distgal**2/cosmo.H(z).value
+        like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal)*distgal*distgal*(cosmo.comoving_distance(z).value+(1.+z)/cosmo.H(z).value)
+        normalization = 1.
     elif ((zerr_use==True) & (cosmo_use==False)):
         ngals = z.shape[0]
         like_gals = np.zeros(ngals)
         z_s = np.arange(z_min,z_max, step=0.02)
         const = (c/1000.)/H0
-        print H0
+        normalization = H0**3
         for i in range(ngals):
             # Multiply the 2 Gaussians (redshift pdf and GW likelihood) with a change of variables into one Gaussian with mean Mu_new and std sigma_new
             #mu_new = (z[i]*diststd[i]*diststd[i]/(const*const)+ distmu[i]/const*zerr[i])/(diststd[i]*diststd[i]/(const*const)+zerr[i]*zerr[i])
@@ -49,11 +52,11 @@ def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min
         cosmo = FlatLambdaCDM(H0=H0, Om0=0.3, Tcmb0=2.725)
         like_gals = np.zeros(ngals)
         z_s = np.arange(z_min,z_max, step=0.02)
-        print H0
+        normalization = 1.
         for i in range(ngals):
-            like_gals[i] = pb_gal[i] * distnorm[i] * romb(gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i],cosmo.luminosity_distance(z[i]).value)*z[i]*z[i], dx=0.02)
+            dist_gal = cosmo.luminosity_distance(z[i]).value
+            like_gals[i] = pb_gal[i] * distnorm[i] * romb(gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i],dist_gal)*dist_gal*dist_gal/cosmo.H(z[i]).value, dx=0.02)
 
-    normalization = H0**3
     lnlike_sum = np.log(np.sum(like_gals)/normalization)
     return lnlike_sum
 
