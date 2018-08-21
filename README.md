@@ -7,7 +7,7 @@ This code estimates a posterior probability for the Hubble constant using a skym
 
 *Note: At the moment this is running in the close distances approximation, with no deceleration parameter!*
 
-Contributors: Antonella Palmese, Jim Annis, Marcelle Soares-Santos, Maria E. Pereira, and DES collaborators.
+Contributors: Antonella Palmese, Jim Annis, Marcelle Soares-Santos, Maria E. Pereira, Alyssa Garcia and DES collaborators.
 
 ## Before running 
 
