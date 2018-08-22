@@ -31,6 +31,8 @@ parser.add_argument('--cosmo_use', default=False, type=bool,
                     help='Use full cosmology for dL.')
 parser.add_argument('--zerr_use', default=False,  type=bool,
                     help='Galaxy redshift is a Gaussian instead of delta function.')
+parser.add_argument('--blind', default=False,  type=bool,
+                    help='Blinding of the H0 results.')
 
 
 args = parser.parse_args()
@@ -44,6 +46,7 @@ H0_min = args.Hmin
 H0_max = args.Hmax
 cosmo_use = args.cosmo_use
 zerr_use = args.zerr_use
+blind = args.blind
 
 pb_frac = 0.7 #Fraction of the skymap probability to consider, decrease for speed
 H0bins = 100
@@ -64,7 +67,7 @@ nest = False #Watch out! mock maps have nest=True but BCC has False at the momen
 
 DIR_SOURCE = os.getcwd()
 DIR_MAIN = DIR_SOURCE.rsplit('/', 1)[0]
-DIR_CATALOG = "/Users/palmese/work/GW/Dark_sirens/catalogs/buzzard/" # DIR_MAIN+'/catalogs/'
+DIR_CATALOG = DIR_MAIN+'/catalogs/'
 DIR_SKYMAP = DIR_MAIN+'/skymaps/'
 DIR_PLOTS = DIR_MAIN+'/plots/'
 DIR_OUT = DIR_MAIN+'/out/'
@@ -166,11 +169,12 @@ for nevent in range(nevents):
     lnposterior=[]
     pixarea = hp.nside2pixarea(NSIDE)
 
-    print "Estimating Posterior for H0 values:"
+    print "Estimating Posterior for H0 values:\n"
     for i in range(H0bins):
         lnposterior_bin = pos.lnprob(H0_array[i], z_gal, zerr_gal, pb_gal, distmu_gal, distsigma_gal, distnorm_gal, pixarea, H0_min, H0_max, z_min, z_max, zerr_use=zerr_use, cosmo_use=cosmo_use)
         #print i, H0_array[i],lnposterior_bin
         lnposterior.append(lnposterior_bin)
+
 
     posterior[:,nevent]=np.exp(lnposterior)
 
@@ -180,51 +184,94 @@ for nevent in range(nevents):
 
     maxposterior = posterior[np.argmax(lnposterior)]
 
-    print "ML percentile: ", perc_max
-    print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array)
-    print "H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_array)
+
+    if blind:
+        #Output path for blinding file
+        blindpath = DIR_MAIN+"/blinding_file.p"
+        H0_blinded_array = pos.make_blind(H0_array, blindpath)
+        print 'Applying blinding factor. Saving value on ', blindpath
+        print "\nBlinded ML percentile: ", perc_max
+        print "Blinded H0 ML: ", H0_blinded_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_blinded_array)-H0_blinded_array[idx_max], "-", H0_blinded_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_blinded_array)
+        print "Blinded H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_blinded_array)
+    else:
+        print 'No blinding applied!'
+        print "\nML percentile: ", perc_max
+        print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array)
+        print "H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_array)
 
 
 plt.clf()
 for nevent in range(nevents):
     norm = np.trapz(posterior[:,nevent], H0_array)
     posterior[:,nevent] = posterior[:,nevent]/norm
-    plt.plot(H0_array, posterior[:,nevent], label="Event "+str(nevent))
+    if blind:
+        plt.plot(H0_blinded_array, posterior[:,nevent], label="Event "+str(nevent)+" - Blinded")
+    else:
+        plt.plot(H0_array, posterior[:,nevent], label="Event "+str(nevent))
 
 if nevents>1:
     posterior_final = np.prod(posterior, axis=1)
     norm = np.trapz(posterior_final, H0_array)
     posterior_final = posterior_final/norm
-    plt.plot(H0_array, posterior_final, label="Final")
+
     idx_max = np.argmax(posterior_final)
     perc_max = posterior_final[:idx_max].sum()/posterior_final.sum()
     maxposterior = posterior_final[idx_max]
-    print "-------- Final H0 estimate ---------"
-    print "ML percentile: ", perc_max
-    print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior_final, H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior_final, H0_array)
-    print "H0 Median: ", pos.percentile(0.50, posterior_final, H0_array)
-    cols = np.column_stack((H0_array,posterior, posterior_final))
-    fmt = "%10.5f "
-    header = "H0 "
-    for i in range(nevents+1):
-        fmt=fmt+"%10.6e "
-        header = header+" Posterior_"+str(i)
-    header = header+" Final "
-else:
-    header = "H0 posterior"
-    cols = np.column_stack((H0_array,posterior))
-    fmt = "%10.5f %10.6e"
 
-np.savetxt(DIR_OUT+'posterior_'+infile.rsplit('.')[0]+'_'+str(nevents)+'.txt',cols, header=header, fmt=fmt)
+    fmt = "%10.5f "
+    if blind:
+        plt.plot(H0_blinded_array, posterior_final, label="Final - Blinded")
+        
+        print "-------- Final Blinded H0 estimate ---------"
+        print "ML percentile: ", perc_max
+        H0_blinded_errp = pos.percentile(perc_max+0.34, posterior_final, H0_blinded_array)-H0_blinded_array[idx_max]
+        H0_blinded_errm = H0_blinded_array[idx_max] - pos.percentile(perc_max-0.34, posterior_final, H0_blinded_array) 
+        print "Blinded H0 ML: ", H0_blinded_array[idx_max], "+", H0_errp, "-", H0_errm
+        print "Blinded H0 Median: ", pos.percentile(0.50, posterior_final, H0_blinded_array)
+        cols = np.column_stack((H0_blinded_array,posterior, posterior_final))
+        header = "H0 Blinded"
+        for i in range(nevents+1):
+            fmt=fmt+"%10.6e "
+            header = header+" Posterior_"+str(i)
+        header = header+" Final "
+    else:
+        plt.plot(H0_array, posterior_final, label="Final")
+
+        print "-------- Final H0 estimate ---------"
+        print "ML percentile: ", perc_max
+        H0_errp = pos.percentile(perc_max+0.34, posterior_final, H0_array)-H0_array[idx_max]
+       	H0_errm	= H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior_final, H0_array)
+        print "Blinded H0 ML: ", H0_blinded_array[idx_max], "+", H0_errp, "-", H0_errm   
+        print "H0 Median: ", pos.percentile(0.50, posterior_final, H0_array)
+
+        cols = np.column_stack((H0_array,posterior, posterior_final))
+        header = "H0 "
+        for i in range(nevents+1):
+            fmt=fmt+"%10.6e "
+            header = header+" Posterior_"+str(i)
+        header = header+" Final "
+
+else:
+    if blind: 
+        header = "Blinded H0 posterior"
+        cols = np.column_stack((H0_array,posterior))
+        fmt = "%10.5f %10.6e"
+    else:
+        header = "H0 posterior"
+        cols = np.column_stack((H0_array,posterior))
+        fmt = "%10.5f %10.6e"
 
 plt.legend()
 plt.xlabel('$H_0$ [km/s/Mpc]',fontsize=20)
 plt.ylabel('$p$',fontsize=20)
 plt.tight_layout()
-#plt.show()
-plt.savefig(DIR_PLOTS+'H0_flask_posterior_'+str(nevents)+'.png')
 
-
+if blind:
+    plt.savefig(DIR_PLOTS+'H0_flask_posterior_'+str(nevents)+'_blinded.png')
+    np.savetxt(DIR_OUT+'posterior_'+infile.rsplit('.')[0]+'_'+str(nevents)+'_blinded.txt',cols, header=header, fmt=fmt)
+else:
+    plt.savefig(DIR_PLOTS+'H0_flask_posterior_'+str(nevents)+'.png')
+    np.savetxt(DIR_OUT+'posterior_'+infile.rsplit('.')[0]+'_'+str(nevents)+'.txt',cols, header=header, fmt=fmt)
 
 
 
