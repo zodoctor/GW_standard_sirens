@@ -5,6 +5,8 @@ from scipy.stats import norm
 from astropy.cosmology import FlatLambdaCDM
 import scipy.integrate as integrate
 from scipy.integrate import romb
+import pickle
+import os 
 
 #################################
 ########### H0 utils ############
@@ -21,6 +23,23 @@ def percentile(perc, pdf, xarray): #May not be perfect due to binning... Valid o
         sum_pdf = pdf[:idx].sum()/tot
         idx=idx+1
     return xarray[idx-1]
+
+def make_blind(H0_true, outpath):
+    '''
+    This function check if the binary blinding factor file is already
+    created. If it is: read and apply the blinding factor on H0. If not:
+    generate the factor, save and apply.
+    '''
+
+    if os.path.isfile(outpath):
+        B_H0 = pickle.load(open(outpath, "rb"))
+        H0_blinded = H0_true*B_H0
+    else:
+        B_H0 = np.fabs(np.random.randn()*0.3 + 1.) #Normal with sigma=0.3, mu=1 
+        outarr = np.array([B_H0])
+        pickle.dump(outarr, open(outpath, "wb"))
+        H0_blinded = H0_true*B_H0
+    return H0_blinded
 
 #### The likelihood has the option to have delta functions or Gaussians for redshifts, and the luminosity distance can be computed from Flat lambdaCDM or simple Hubble constant. All options are left so that the user can choose how quick the likelihood will be computed, depending also on the redshift range
 
