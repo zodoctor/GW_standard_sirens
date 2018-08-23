@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 from astropy. io import fits
 import healpy as hp
 from math import pi
@@ -191,12 +193,12 @@ for nevent in range(nevents):
         H0_blinded_array = pos.make_blind(H0_array, blindpath)
         print 'Applying blinding factor. Saving value on ', blindpath
         print "\nBlinded ML percentile: ", perc_max
-        print "Blinded H0 ML: ", H0_blinded_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_blinded_array)-H0_blinded_array[idx_max], "-", H0_blinded_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_blinded_array)
+#        print "Blinded H0 ML: ", H0_blinded_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_blinded_array)-H0_blinded_array[idx_max], "-", H0_blinded_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_blinded_array)
         print "Blinded H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_blinded_array)
     else:
         print 'No blinding applied!'
         print "\nML percentile: ", perc_max
-        print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array)
+#        print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array)
         print "H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_array)
 
 
