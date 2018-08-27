@@ -22,7 +22,18 @@ def percentile(perc, pdf, xarray): #May not be perfect due to binning... Valid o
     while (sum_pdf<perc):
         sum_pdf = pdf[:idx].sum()/tot
         idx=idx+1
+        if idx==len(pdf): return xarray[-1]
     return xarray[idx-1]
+
+def perc_idx(perc, pdf): #May not be perfect due to binning... Valid only for regularly spaced xarrays
+    sum_pdf = 0.
+    idx = 0
+    tot = pdf.sum()
+    while (sum_pdf<perc):
+        sum_pdf = pdf[:idx].sum()/tot
+        idx=idx+1
+        if idx==len(pdf): return -1
+    return max(idx-1,0)
 
 def make_blind(H0_true, outpath):
     '''
@@ -43,16 +54,16 @@ def make_blind(H0_true, outpath):
 
 #### The likelihood has the option to have delta functions or Gaussians for redshifts, and the luminosity distance can be computed from Flat lambdaCDM or simple Hubble constant. All options are left so that the user can choose how quick the likelihood will be computed, depending also on the redshift range
 
-def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min, z_max, zerr_use, cosmo_use):
+def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min, z_max, zerr_use, cosmo_use, omegam=0.3):
     if ((zerr_use==False) & (cosmo_use==False)):
         distgal = (c/1000.)*z/H0
-        like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal)*z**2
+        like_gals = pb_gal * distnorm * gauss(distmu,diststd,distgal)*z**2
         normalization = H0**3
     elif ((zerr_use==False) & (cosmo_use==True)):
-        cosmo = FlatLambdaCDM(H0=H0, Om0=0.3, Tcmb0=2.725)
-        distgal = cosmo.luminosity_distance(z).value #in Mpc
-        #like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal)*distgal**2/cosmo.H(z).value
-        like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal)*distgal*distgal*(cosmo.comoving_distance(z).value+(1.+z)/cosmo.H(z).value)
+        cosmo = FlatLambdaCDM(H0=H0, Om0=omegam)
+        dV=cosmo.differential_comoving_volume(z).value / (1+z)**3
+        distgal = cosmo.luminosity_distance(z).value 
+        like_gals = pb_gal * distnorm * gauss(distmu,diststd,distgal) * dV
         normalization = 1.
     elif ((zerr_use==True) & (cosmo_use==False)):
         ngals = z.shape[0]
@@ -61,22 +72,19 @@ def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min
         const = (c/1000.)/H0
         normalization = H0**3
         for i in range(ngals):
-            # Multiply the 2 Gaussians (redshift pdf and GW likelihood) with a change of variables into one Gaussian with mean Mu_new and std sigma_new
-            #mu_new = (z[i]*diststd[i]*diststd[i]/(const*const)+ distmu[i]/const*zerr[i])/(diststd[i]*diststd[i]/(const*const)+zerr[i]*zerr[i])
-            #sigma_new = (diststd[i]*diststd[i]*zerr[i]*zerr[i]/(const*const)/(diststd[i]*diststd[i]/(const*const)+ zerr[i]*zerr[i]))**0.5
-            #like_gals[i]= pb_gal[i] * distnorm[i] * romb(gauss(mu_new, sigma_new, z_s) * z[i]*z[i], dx=0.02)
             like_gals[i]= pb_gal[i] * distnorm[i] * romb( gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i], const*z_s)*z[i]*z[i], dx=0.02)
     else:
         ngals = z.shape[0]
-        cosmo = FlatLambdaCDM(H0=H0, Om0=0.3, Tcmb0=2.725)
+        cosmo = FlatLambdaCDM(H0=H0, Om0=omegam)
         like_gals = np.zeros(ngals)
         z_s = np.arange(z_min,z_max, step=0.02)
         normalization = 1.
         for i in range(ngals):
             dist_gal = cosmo.luminosity_distance(z[i]).value
-            like_gals[i] = pb_gal[i] * distnorm[i] * romb(gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i],dist_gal)*dist_gal*dist_gal/cosmo.H(z[i]).value, dx=0.02)
+            dV=cosmo.differential_comoving_volume(z[i]).value / (1+z[i])**3
+            like_gals[i] = pb_gal[i] * distnorm[i] * romb( gauss(z[i],zerr[i],z_s) * gauss(distmu[i],diststd[i],dist_gal) * dV, dx=0.02)
 
-    lnlike_sum = np.log(np.sum(like_gals)/normalization)
+    lnlike_sum = np.log(max(1.e-300,np.sum(like_gals)/normalization))
     return lnlike_sum
 
 #### Flat prior ####
@@ -88,11 +96,11 @@ def lnprior(H0, H0_min, H0_max):
 
 ##### Posterior ####
 
-def lnprob(H0, z, zerr, pb_gal, distmu, diststd, distnorm, pixarea, H0_min, H0_max, z_min, z_max, zerr_use=False, cosmo_use=False):
+def lnprob(H0, z, zerr, pb_gal, distmu, diststd, distnorm, pixarea, H0_min, H0_max, z_min, z_max, zerr_use=False, cosmo_use=False,omegam=0.3):
 	lp = lnprior(H0, H0_min, H0_max)
 	if not np.isfinite(lp):
 		return -np.inf
-	return lp + lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min, z_max, zerr_use, cosmo_use)
+	return lp + lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min, z_max, zerr_use, cosmo_use,omegam)
 
 #########################################
 ########### Time delay utils ############
