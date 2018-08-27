@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.constants import c #m/s
 from scipy.stats import norm
-from astropy.cosmology import FlatLambdaCDM
+from astropy.cosmology import FlatLambdaCDM, z_at_value
 import argparse
 import os
 import posterior_utils as pos
+import astropy.units as u 
 
 parser = argparse.ArgumentParser(description='Compute H0 posterior given N events')
 
@@ -18,7 +19,7 @@ parser.add_argument('--infile', default='truthChinchillaY3.fits',
                     help='Input galaxy catalog name with hpix numbers.')
 parser.add_argument('--skymap', default='simevents',
                     help='Input skymap')
-parser.add_argument('--nevents', type=int, default=1, 
+parser.add_argument('--nevents', type=int,  
                     help='Number of events to run. If not given, will combine all events in the event_list.')
 parser.add_argument('--zmin', default=0.0, type=float,
                     help='Minimum redshift to be considered in the galaxy catalog. Default is 0.0')
@@ -40,13 +41,19 @@ parser.add_argument('--maglim', default=999., type=float,
                     help='Limiting magnitude of the galaxy catalog.')
 parser.add_argument('--rootdir', #default='/data/des41.a/data/marcelle/GW170814/dark-siren',
                     help='Path to top level work dir')
+parser.add_argument('--p', default=0.90, type=float, 
+                    help='Fraction of the skymap probability to consider. Default is 0.9 (decrease for speed)')
+parser.add_argument('--test', default=0, type=int, choices=range(1,2),
+                    help='Pick one of the simple pre-defined sanity checks to run.\n Test 1: scrambled galaxies')
+parser.add_argument('--Hbins', default=200, type=int,
+                    help='Number of H0 bins to evaluate. Default is 200 (decrease for speed)')
 
 args = parser.parse_args()
 
 infile = args.infile
 glxcat = infile.split('.fits')[0]
 skymap = (args.skymap).split('.fits')[0]
-nevents = args.nevents
+#nevents = args.nevents
 event_list = skymap+'.txt'
 z_min = args.zmin
 z_max = args.zmax
@@ -58,14 +65,11 @@ blind = args.blind
 zerr = args.zerr
 maglim = args.maglim
 
+outlabel='posterior_'+glxcat+'_'+str(args.maglim)+'_'+str(args.zerr)+'_'+skymap
+if blind: outlabel=outlabel+'_blinded'
 
-pb_frac = 0.01 #Fraction of the skymap probability to consider, decrease for speed
-H0bins = 200
-
-# Add by hand an error test_photozs_err to the galaxy redshifts. Note this is fixed for all galaxies for now!
-
-test_photozs = True
-test_photozs_err = 0.01
+pb_frac = args.p #Fraction of the skymap probability to consider, decrease for speed
+H0bins = args.Hbins
 
 # Names of the input galaxy catalog columns
 
@@ -88,7 +92,11 @@ DIR_SKYMAP = DIR_MAIN+'/skymaps/'
 DIR_PLOTS = DIR_MAIN+'/plots/'
 DIR_OUT = DIR_MAIN+'/out/'
 
+plot_axvlines = True
+
 if os.path.isfile(DIR_CATALOG+event_list):
+
+    print "Reading list of events file..."
 
     events=np.genfromtxt(DIR_CATALOG+event_list, 
                          dtype="i8,i8,f8,f8,f8,f8,f8,f8",
@@ -98,7 +106,10 @@ if os.path.isfile(DIR_CATALOG+event_list):
     if events.shape == ():
         nevents = 1
     else:
-        nevents = events.shape[0]
+        if args.nevents == None: 
+            nevents = events.shape[0]
+        else:
+            nevents = min(args.nevents,events.shape[0])
         
     if nevents == 1: skymap = skymap+'0'
     
@@ -112,14 +123,39 @@ if os.path.isfile(DIR_CATALOG+event_list):
 
 else:
     nevents=1
-    cosmo='None'
-    H0=0.0 
+    cosmo=None
+    H0=70.0 
     Omega_m=0.3
+
+print "Number of events to process:", nevents
 
 print "Reading in galaxy catalogs..."
 
 h = fits.open(DIR_CATALOG+infile)[1].data
+
 mask_z = ( (h[z_column_name]>z_min) & (h[z_column_name]<z_max) & (h[mag_column_name][:,1]<maglim) )
+
+if (args.test==1):
+    print "Running Test Mode 1: Scrambling galaxies ra,dec,z values"
+    nvalues=h[ra_column_name].size
+    minvalue=min(h[ra_column_name])
+    maxvalue=max(h[ra_column_name])
+    h[ra_column_name]=np.random.uniform(minvalue,maxvalue,nvalues)
+    minvalue=np.deg2rad(min(h[dec_column_name])+90)
+    maxvalue=np.deg2rad(max(h[dec_column_name])+90)
+    h[dec_column_name]=np.rad2deg(np.arccos(1-2*np.random.uniform(minvalue,maxvalue,nvalues)))-90.
+    h[z_column_name]=np.zeros(nvalues)
+    nmaskedvalues=h[z_column_name][mask_z].size
+    hz=np.random.uniform(z_min,z_max,nmaskedvalues)    
+    h[z_column_name]=hz.resize(nvalues)
+    maglim = 999.
+    zerr_use = False
+    outlabel=outlabel+'_test'+str(args.test)
+    cosmo=None
+    plot_axvlines=False
+    H0bins=25
+
+
 ra_g=h[ra_column_name][mask_z]
 dec_g=h[dec_column_name][mask_z]
 
@@ -142,14 +178,27 @@ except:
 
 
 z_g = h[z_column_name][mask_z]
-if zerr > 0.:
-    z_g = np.random.normal(loc=z_g, scale=zerr*(1+z_g))
 
+if zerr_column_name in h.dtype.names:
+    zerr_g = h[zerr_column_name][mask_z]
+    zerr = np.mean(zerr_g)
+else:
+    print "No zerr provided in input catalog. Setting errors to "+str(zerr)+" * (1+z)"
+    zerr_g = zerr * (1+z_g)
+    if zerr > 0.:
+        z_g = np.random.normal(loc=z_g, scale=zerr_g)
+
+if zerr<=0.:
+    zerr_use = False
 
 H0_array = np.linspace(H0_min,H0_max,num=H0bins)
 posterior = np.zeros((H0_array.shape[0],nevents))
 
+distmu_average = np.zeros(nevents)
+distsigma_average = np.zeros(nevents)
 
+pixarea = hp.nside2pixarea(NSIDE)
+pixarea_deg2 = hp.pixelfunc.nside2pixarea(NSIDE,degrees=True) 
 
 for nevent in range(nevents):
 
@@ -178,8 +227,11 @@ for nevent in range(nevents):
 
     idx_sort_cut = idx_sort_up[:id]
 
-    roi_area = hp.pixelfunc.nside2pixarea(NSIDE,degrees=True) * id
+    roi_area = pixarea_deg2 * id
     print "ROI total area: ", roi_area, " , npix:", id
+
+    distmu_average[nevent] = np.average(distmu[idx_sort_cut],weights=pb[idx_sort_cut])
+    distsigma_average[nevent] = np.average(distsigma[idx_sort_cut],weights=pb[idx_sort_cut])
 
     z_gal , zerr_gal, pb_gal, distmu_gal, distsigma_gal, distnorm_gal, ra_gal, dec_gal = [], [], [], [], [], [], [], []
 
@@ -190,8 +242,7 @@ for nevent in range(nevents):
         z_gal.append(z_g[idx_this_hpix])
         ra_gal.append(ra_g[idx_this_hpix])
         dec_gal.append(dec_g[idx_this_hpix])
-        #zerr_gal.append()
-        #print idx_hpix, pb[idx_hpix], distmu[idx_hpix], distsigma[idx_hpix], distnorm[idx_hpix]
+        zerr_gal.append(zerr_g[idx_this_hpix])
         ngals_this_hpix = z_g[idx_this_hpix].shape[0]
         pb_gal.append(np.full(ngals_this_hpix,pb[idx_hpix]))
         distmu_gal.append(np.full(ngals_this_hpix,distmu[idx_hpix]))
@@ -205,15 +256,11 @@ for nevent in range(nevents):
     distnorm_gal = np.concatenate(distnorm_gal)
     ra_gal = np.concatenate(ra_gal)
     dec_gal = np.concatenate(dec_gal)
-    zerr_gal = np.zeros(z_gal.shape[0]) #np.concatenate(zerr_gal) # Here zerr is 0 because it is not given in the sims
-
-    if (test_photozs==True):
-        zerr_gal.fill(test_photozs_err)
+    zerr_gal = np.concatenate(zerr_gal) 
 
     #Posterior without normalization at the moment, and with a delta function for z
     print "There are ", str(ra_gal.shape[0]), " galaxies within ", str(pb_frac*100.), "%, and z between ", z_min, z_max
     lnposterior=[]
-    pixarea = hp.nside2pixarea(NSIDE)
 
     print "Estimating Posterior for H0 values:"
     for i in range(H0bins):
@@ -254,8 +301,6 @@ for nevent in range(nevents):
     print " H0 ML: ", H0_maxlike, "+", H0_err_p, "-", H0_err_m 
     print " H0 Median: ", H0_median
 
-
-
 fmt = "%10.5f"
 if blind:        
     header = "H0_Blinded"
@@ -264,8 +309,9 @@ else:
 
 for nevent in range(nevents):
     norm = np.trapz(posterior[:,nevent], H0_array_out)
-    posterior[:,nevent] = posterior[:,nevent]/norm    
-    plt.plot(H0_array_out, posterior[:,nevent], label="Event "+str(nevent))
+    posterior[:,nevent] = posterior[:,nevent]/norm
+    dl=int(distmu_average[nevent])
+    plt.plot(H0_array_out, posterior[:,nevent], label="Event "+str(nevent)+": "+str(dl)+" Mpc")
     fmt=fmt+" %10.6e"
     header = header+" Posterior_"+str(nevent)
 
@@ -273,7 +319,8 @@ if nevents == 1:
     cols = np.column_stack((H0_array_out,posterior))
     header = header.split()[0]+" Posterior"
     plt.clf()
-    plt.plot(H0_array_out, posterior[:,nevent], color='k')
+    dl=int(distmu_average[0])
+    plt.plot(H0_array_out, posterior[:,nevent], color='k', label=str(dl)+" Mpc")
 
 if nevents>1:
     posterior_final = np.prod(posterior, axis=1)
@@ -299,7 +346,7 @@ if nevents>1:
     print " ML percentile: ", perc_max
     print " H0 ML: ", H0_maxlike, "+", H0_err_p, "-", H0_err_m 
     print " H0 Median: ", H0_median
-    if cosmo != 'None': print " H0 true: ", H0
+    if cosmo != None: print " H0 true: ", H0
 
     cols = np.column_stack((H0_array_out,posterior, posterior_final))
 
@@ -308,13 +355,11 @@ if nevents>1:
     fmt=fmt+" %10.6e"
     header = header+" Posterior_Final"
 
-outlabel='posterior_'+glxcat+'_'+str(args.maglim)+'_'+str(args.zerr)+'_'+skymap
-if blind: outlabel=outlabel+'_blinded'
-
-plt.axvline(x=H0_array_out[idx_max],color='k')
-plt.axvline(x=H0_array_out[idx_err_p],color='k',linestyle='dotted')
-plt.axvline(x=H0_array_out[idx_err_m],color='k',linestyle='dotted')
-if H0>0: plt.axvline(x=H0,color='k',linestyle='dashed')
+if plot_axvlines:
+    plt.axvline(x=H0_array_out[idx_max],color='k')
+    plt.axvline(x=H0_array_out[idx_err_p],color='k',linestyle='dotted')
+    plt.axvline(x=H0_array_out[idx_err_m],color='k',linestyle='dotted')
+    if cosmo != None : plt.axvline(x=H0,color='k',linestyle='dashed')
 plt.legend()
 plt.xlabel('$H_0$ [km/s/Mpc]',fontsize=20)
 plt.ylabel('$p$',fontsize=20)
@@ -329,7 +374,7 @@ outfile.close()
 if os.path.isfile(DIR_CATALOG+event_list):
     outfile = open(DIR_OUT+outlabel+'_nevents_summary.txt','w')
     outfile.write('# id host_id ra dec z d derr roi_size roi_area maglim zerr H0_maxlike H0_errp H0_errm H0_median H0_true\n')
-    if nevents == 1:
+    if events.shape == () :
         outfile.write('%i %i %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n' % ( events['id'], events['host_id'], events['ra'], events['dec'], events['z'], events['d'], events['derr'], events['roi_size'], roi_area, maglim, zerr, H0_maxlike, H0_err_p, H0_err_m, H0_median, H0 ))
     else:
         for i in range(nevents):
