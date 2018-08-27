@@ -5,6 +5,7 @@ import healpy as hp
 import matplotlib.pyplot as plt
 from scipy.special import erf
 from astropy.table import Table
+import os 
 
 # example of how to use mockmaps.py in your code:
 #import mockmaps
@@ -39,13 +40,14 @@ def gaussian2d_from_sample_map(ra_coord=0.,dec_coord=0.,
 
     # if ra_coord is an array, assume dec_coord, sigma_ra, sigma_dec, distance, distance_err are also arrays of same length:
     if isinstance(ra_coord, (list, tuple, np.ndarray)):
-        basename=mock_map_file_name.split('.')[0]
+        dirname=os.path.dirname(mock_map_file_name)
+        basename=dirname+'/'+(mock_map_file_name.split('/')[-1]).split('.')[0]
         extension=".fits"
         for i in range(len(ra_coord)):
             mock_map=one_gaussian2d_from_sample_map(m,ra_coord[i],dec_coord[i],sigma_ra[i],sigma_dec[i],distance[i],distance_err[i],nside)
             ##hp.write_map(mock_map_file_name[i],mock_map,column_names=["PROB","DISTMU","DISTSIGMA","DISTNORM"],nest=True,coord='C')
             t=Table(mock_map,names=("PROB","DISTMU","DISTSIGMA","DISTNORM"))
-            mock_map_file_name=basename+'_'+str(i)+extension
+            mock_map_file_name=basename+str(i)+extension
             t.write(mock_map_file_name,format='fits')
         
     # if ra_coord is a scalar, assume they are all scalars:
