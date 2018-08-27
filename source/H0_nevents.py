@@ -71,7 +71,6 @@ maglim = args.maglim
 outlabel='posterior_'+glxcat+'_'+str(args.maglim)+'_'+str(args.zerr)+'_'+skymap
 if blind: outlabel=outlabel+'_blinded'
 
-NSIDE = 1024     #skymap nside, corresponding also to the nside of the hpix column in the galaxy catalog
 
 # Add by hand an error test_photozs_err to the galaxy redshifts. Note this is fixed for all galaxies for now!
 
@@ -148,7 +147,10 @@ print "Reading in galaxy catalogs..."
 
 h = fits.open(DIR_CATALOG+infile)[1].data
 
-mask_z = ( (h[z_column_name]>z_min) & (h[z_column_name]<z_max) & (h[mag_column_name][:,1]<maglim) )
+try:
+    mask_z = ( (h[z_column_name]>z_min) & (h[z_column_name]<z_max) & (h[mag_column_name][:,1]<maglim) )
+except KeyError:
+    mask_z = ( (h[z_column_name]>z_min) & (h[z_column_name]<z_max))
 
 if (args.test==1):
     print "Running Test Mode 1: Scrambling galaxies ra,dec,z values"
@@ -174,23 +176,6 @@ if (args.test==1):
 ra_g=h[ra_column_name][mask_z]
 dec_g=h[dec_column_name][mask_z]
 
-#Read in the first skymap to get nside
-if (nevents==1):
-    skymap_name = DIR_SKYMAP+skymap+".fits"
-else:
-    skymap_name = DIR_SKYMAP+skymap+str(0)+".fits"
-map = fits.open(skymap_name)[1].data
-pb = map['PROB'].flatten()
-NSIDE = hp.pixelfunc.get_nside(pb)
-
-try:
-    pix_g = h[hpix_column_name][mask_z]
-except:
-    phi_g = ra_g*pi/180.
-    theta_g = (90.-dec_g)*pi/180.
-    pix_g = hp.pixelfunc.ang2pix(NSIDE, theta_g, phi_g, nest=nest)
-    print "No hpix column in catalog"
-
 
 z_g = h[z_column_name][mask_z]
 
@@ -212,8 +197,6 @@ posterior = np.zeros((H0_array.shape[0],nevents))
 distmu_average = np.zeros(nevents)
 distsigma_average = np.zeros(nevents)
 
-pixarea = hp.nside2pixarea(NSIDE)
-pixarea_deg2 = hp.pixelfunc.nside2pixarea(NSIDE,degrees=True) 
 
 for nevent in range(nevents):
 
@@ -224,6 +207,18 @@ for nevent in range(nevents):
         skymap_name = DIR_SKYMAP+skymap+str(nevent)+".fits"
     #map = fits.open(skymap_name)[1].data
     pb,distmu,distsigma,distnorm = hp.read_map(skymap_name, field=range(4))
+    NSIDE = hp.npix2nside(len(pb))
+    pixarea = hp.nside2pixarea(NSIDE)
+    pixarea_deg2 = hp.pixelfunc.nside2pixarea(NSIDE,degrees=True) 
+    try:
+        pix_g = h[hpix_column_name][mask_z]
+    except:
+        phi_g = ra_g*pi/180.
+        theta_g = (90.-dec_g)*pi/180.
+        pix_g = hp.pixelfunc.ang2pix(NSIDE, theta_g, phi_g, nest=nest)
+        print "No hpix column in catalog"
+
+
     #pb = map['PROB']
     #distmu = map['DISTMU']
     #distsigma = map['DISTSIGMA']
