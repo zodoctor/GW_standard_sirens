@@ -27,11 +27,11 @@ def percentile(perc, pdf, xarray): #May not be perfect due to binning... Valid o
 def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min, z_max, zerr_use, cosmo_use):
     if ((zerr_use==False) & (cosmo_use==False)):
         distgal = (c/1000.)*z/H0
-        like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal)*z**2
+        like_gals = pb_gal *  norm(distmu, diststd).pdf(distgal)
     elif ((zerr_use==False) & (cosmo_use==True)):
-        cosmo = FlatLambdaCDM(H0=H0, Om0=0.3, Tcmb0=2.725)
+        cosmo = FlatLambdaCDM(H0=H0, Om0=0.307, Tcmb0=2.725)
         distgal = cosmo.luminosity_distance(z) #in Mpc
-        like_gals = pb_gal * distnorm * norm(distmu, diststd).pdf(distgal.value)*z**2
+        like_gals = pb_gal *  norm(distmu, diststd).pdf(distgal.value)
     elif ((zerr_use==True) & (cosmo_use==False)):
         ngals = z.shape[0]
         like_gals = np.zeros(ngals)
@@ -43,7 +43,7 @@ def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min
             #mu_new = (z[i]*diststd[i]*diststd[i]/(const*const)+ distmu[i]/const*zerr[i])/(diststd[i]*diststd[i]/(const*const)+zerr[i]*zerr[i])
             #sigma_new = (diststd[i]*diststd[i]*zerr[i]*zerr[i]/(const*const)/(diststd[i]*diststd[i]/(const*const)+ zerr[i]*zerr[i]))**0.5
             #like_gals[i]= pb_gal[i] * distnorm[i] * romb(gauss(mu_new, sigma_new, z_s) * z[i]*z[i], dx=0.02)
-            like_gals[i]= pb_gal[i] * distnorm[i] * romb( gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i], const*z_s)*z[i]*z[i], dx=0.02)
+            like_gals[i]= pb_gal[i] * romb( gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i], const*z_s), dx=0.02)
     else:
         ngals = z.shape[0]
         cosmo = FlatLambdaCDM(H0=H0, Om0=0.3, Tcmb0=2.725)
@@ -51,10 +51,11 @@ def lnlike(H0, z, zerr, pb_gal, distmu, diststd, distnorm, H0_min, H0_max, z_min
         z_s = np.arange(z_min,z_max, step=0.02)
         print H0
         for i in range(ngals):
-            like_gals[i] = pb_gal[i] * distnorm[i] * romb(gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i],cosmo.luminosity_distance(z[i]).value)*z[i]*z[i], dx=0.02)
+            like_gals[i] = pb_gal[i]  * romb(gauss(z[i], zerr[i],z_s) * gauss(distmu[i], diststd[i],cosmo.luminosity_distance(z[i]).value), dx=0.02)
 
-    normalization = H0**3
-    lnlike_sum = np.log(np.sum(like_gals)/normalization)
+    #normalization = H0**3
+    #lnlike_sum = np.log(np.sum(like_gals)/normalization)
+    lnlike_sum = np.log(np.sum(like_gals))
     return lnlike_sum
 
 #### Flat prior ####

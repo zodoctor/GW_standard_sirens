@@ -31,7 +31,9 @@ parser.add_argument('--cosmo_use', default=False, type=bool,
                     help='Use full cosmology for dL.')
 parser.add_argument('--zerr_use', default=False,  type=bool,
                     help='Galaxy redshift is a Gaussian instead of delta function.')
-
+parser.add_argument('--colnames', default=['z','zerr','ra','dec'], type=str,
+                    nargs=4,
+                    help='the three column names in the galaxy catalog for redshift, redshift error, RA, Dec')
 
 args = parser.parse_args()
 
@@ -45,7 +47,7 @@ H0_max = args.Hmax
 cosmo_use = args.cosmo_use
 zerr_use = args.zerr_use
 
-pb_frac = 0.9 #Fraction of the skymap probability to consider, decrease for speed
+pb_frac = 0.90 #Fraction of the skymap probability to consider, decrease for speed
 NSIDE = 1024     #skymap nside, corresponding also to the nside of the hpix column in the galaxy catalog
 H0bins = 100
 
@@ -56,14 +58,16 @@ test_photozs_err = 0.1
 
 # Names of the input galaxy catalog columns
 
-ra_column_name = 'ra'
-dec_column_name = 'dec'
-z_column_name = 'z'
-zerr_column_name = 'zerr'
+colnames = args.colnames
+ra_column_name = colnames[2]
+dec_column_name = colnames[3]
+z_column_name = colnames[0]
+zerr_column_name = colnames[1]
 
 DIR_SOURCE = os.getcwd()
 DIR_MAIN = DIR_SOURCE.rsplit('/', 1)[0]
-DIR_CATALOG = "/Users/palmese/work/GW/Dark_sirens/catalogs/buzzard/" # DIR_MAIN+'/catalogs/'
+#DIR_CATALOG = "/Users/palmese/work/GW/Dark_sirens/catalogs/buzzard/" # DIR_MAIN+'/catalogs/'
+DIR_CATALOG = DIR_MAIN+'/catalogs/'
 DIR_SKYMAP = DIR_MAIN+'/skymaps/'
 DIR_PLOTS = DIR_MAIN+'/plots/'
 DIR_OUT = DIR_MAIN+'/out/'
@@ -101,11 +105,12 @@ for nevent in range(nevents):
         skymap_name = DIR_SKYMAP+skymap
     else:
         skymap_name = DIR_SKYMAP+skymap+str(nevent)+".fits"
-    map = fits.open(skymap_name)[1].data
-    pb = map['PROB']
-    distmu = map['DISTMU']
-    distsigma = map['DISTSIGMA']
-    distnorm = map['DISTNORM']
+    #map = fits.open(skymap_name)[1].data
+    pb,distmu,distsigma,distnorm = hp.read_map(skymap_name, field=range(4))
+    #pb = map['PROB']
+    #distmu = map['DISTMU']
+    #distsigma = map['DISTSIGMA']
+    #distnorm = map['DISTNORM']
 
     #Only choose galaxies within pb_frac probability region
 
@@ -164,15 +169,23 @@ for nevent in range(nevents):
 
     posterior[:,nevent]=np.exp(lnposterior)
 
+    # incorporate \beta(H0), ie. GW selection effect provided
+    # by Maya
+    betafile = np.genfromtxt('H0_normalization_zmax035.txt',names='H0,beta',dtype=float)
+    inv_beta_of_H0 = np.interp(H0_array,betafile['H0'],betafile['beta'])
+    posterior[:,nevent] = np.multiply(posterior[:,nevent],inv_beta_of_H0)
+    
     idx_max = np.argmax(lnposterior)
 
     perc_max = posterior[:idx_max].sum()/posterior.sum()
 
     maxposterior = posterior[np.argmax(lnposterior)]
-
     print "ML percentile: ", perc_max
-    print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array)
-    print "H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_array)
+    print 'approaching bad line',H0_array.shape,posterior.shape
+    print posterior[:,nevent]
+    print "H0 ML: ", H0_array[idx_max], '+', H0_array[np.cumsum(posterior[:,nevent])/np.sum(posterior[:,nevent]) > 0.16][0], '-', H0_array[np.cumsum(posterior[:,nevent])/np.sum(posterior[:,nevent]) > 0.84][0]
+    #print "H0 ML: ", H0_array[idx_max], "+", pos.percentile(perc_max+0.34, posterior[:,nevent], H0_array)-H0_array[idx_max], "-", H0_array[idx_max] - pos.percentile(perc_max-0.34, posterior[:,nevent], H0_array)
+    #print "H0 Median: ", pos.percentile(0.50, posterior[:,nevent], H0_array)
 
 
 plt.clf()
